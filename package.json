@@ -4,6 +4,9 @@
   "private": true,
   "description": "Browser-based grayscale PNG converter.",
   "scripts": {
-    "build": "rm -rf dist && mkdir -p dist && cp -R index.html styles.css app.js manifest.webmanifest sw.js icons dist/"
+    "build": "rm -rf dist && mkdir -p dist/vendor && cp -R index.html styles.css app.js manifest.webmanifest sw.js icons dist/ && cp vendor/imagetracer_v1.2.6.js dist/vendor/"
+  },
+  "dependencies": {
+    "imagetracerjs": "^1.2.6"
   }
 }

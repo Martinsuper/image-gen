@@ -67,8 +67,12 @@
               PNG 位图
             </label>
             <label>
-              <input type="radio" name="format" value="svg" />
-              SVG 矢量容器
+              <input type="radio" name="format" value="svg-embed" />
+              SVG 嵌入图
+            </label>
+            <label>
+              <input type="radio" name="format" value="svg-vector" />
+              SVG 路径描摹
             </label>
           </fieldset>
 
@@ -153,6 +157,7 @@
       </li>
     </template>
 
+    <script src="./vendor/imagetracer_v1.2.6.js"></script>
     <script src="./app.js" type="module"></script>
   </body>
 </html>

@@ -159,7 +159,7 @@ function renderQueue() {
 
 function updateActions() {
   const hasItems = state.items.length > 0;
-  const format = getSelectedFormat().toUpperCase();
+  const format = getSelectedFormatLabel();
 
   downloadCurrent.textContent = `下载 ${format}`;
   downloadAll.textContent = `批量下载 ${format}`;
@@ -232,7 +232,7 @@ async function downloadItem(item) {
   const image = await loadImage(item);
   const canvas = createProcessedCanvas(image);
   const format = getSelectedFormat();
-  const blob = format === "svg" ? createSvgBlob(canvas, item.file.name) : await createPngBlob(canvas);
+  const blob = await createExportBlob(canvas, item.file.name, format);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
@@ -242,6 +242,18 @@ async function downloadItem(item) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+async function createExportBlob(canvas, fileName, format) {
+  if (format === "svg-embed") {
+    return createEmbeddedSvgBlob(canvas, fileName);
+  }
+
+  if (format === "svg-vector") {
+    return createVectorSvgBlob(canvas, fileName);
+  }
+
+  return createPngBlob(canvas);
 }
 
 function createProcessedCanvas(image) {
@@ -266,7 +278,7 @@ function createPngBlob(canvas) {
   });
 }
 
-function createSvgBlob(canvas, fileName) {
+function createEmbeddedSvgBlob(canvas, fileName) {
   const title = escapeXml(fileName.replace(/\.[^.]+$/, ""));
   const dataUrl = canvas.toDataURL("image/png");
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
@@ -279,8 +291,52 @@ function createSvgBlob(canvas, fileName) {
   return new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
 }
 
+function createVectorSvgBlob(canvas, fileName) {
+  const imageTracer = getImageTracer();
+
+  if (!imageTracer) {
+    throw new Error("Vector tracer is not available.");
+  }
+
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const svg = imageTracer.imagedataToSVG(imageData, {
+    colorsampling: 0,
+    colorquantcycles: 1,
+    numberofcolors: 8,
+    pathomit: 4,
+    ltres: 1,
+    qtres: 1,
+    rightangleenhance: true,
+    linefilter: true,
+    strokewidth: 0,
+    scale: 1,
+    roundcoords: 1,
+    viewbox: true,
+    desc: false,
+  });
+  const title = `<title>${escapeXml(fileName.replace(/\.[^.]+$/, ""))}</title>`;
+  const labeledSvg = svg.replace(/<svg\b([^>]*)>/, `<svg$1 role="img">${title}`);
+
+  return new Blob([labeledSvg], { type: "image/svg+xml;charset=utf-8" });
+}
+
+function getImageTracer() {
+  return globalThis.ImageTracer ?? window.ImageTracer ?? self.ImageTracer;
+}
+
 function getSelectedFormat() {
   return formatInputs.find((input) => input.checked)?.value ?? "png";
+}
+
+function getSelectedFormatLabel() {
+  const labels = {
+    png: "PNG",
+    "svg-embed": "SVG 嵌入图",
+    "svg-vector": "SVG 路径描摹",
+  };
+
+  return labels[getSelectedFormat()] ?? "PNG";
 }
 
 function getProcessingOptions() {
@@ -294,7 +350,10 @@ function getProcessingOptions() {
 function getOutputName(fileName, format = getSelectedFormat()) {
   const cleanName = fileName.replace(/\.[^.]+$/, "");
   const suffix = renameFiles.checked ? "_gray" : "";
-  return `${cleanName}${suffix}.${format}`;
+  const extension = format.startsWith("svg") ? "svg" : "png";
+  const modeSuffix = format === "svg-vector" ? "_vector" : "";
+
+  return `${cleanName}${suffix}${modeSuffix}.${extension}`;
 }
 
 function escapeXml(value) {

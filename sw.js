@@ -1,4 +1,4 @@
-const CACHE_NAME = "gray-png-converter-v3";
+const CACHE_NAME = "gray-png-converter-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const ASSETS = [
   "./manifest.webmanifest",
   "./sw.js",
   "./icons/icon.svg",
+  "./vendor/imagetracer_v1.2.6.js",
 ];
 
 self.addEventListener("install", (event) => {
