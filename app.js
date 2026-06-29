@@ -23,6 +23,7 @@ const state = {
 };
 
 const modeInputs = [...document.querySelectorAll('input[name="mode"]')];
+const formatInputs = [...document.querySelectorAll('input[name="format"]')];
 
 fileInput.addEventListener("change", () => {
   addFiles(fileInput.files);
@@ -49,7 +50,7 @@ strength.addEventListener("input", () => {
   renderActive();
 });
 
-[keepAlpha, renameFiles, ...modeInputs].forEach((input) => {
+[keepAlpha, renameFiles, ...modeInputs, ...formatInputs].forEach((input) => {
   input.addEventListener("change", renderActive);
 });
 
@@ -215,28 +216,69 @@ function mix(original, target, amount) {
 
 async function downloadItem(item) {
   const image = await loadImage(item);
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-
-  drawImageToCanvas(image, canvas, context);
-  applyGrayscale(canvas, context);
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  const canvas = createProcessedCanvas(image);
+  const format = getSelectedFormat();
+  const blob = format === "svg" ? createSvgBlob(canvas, item.file.name) : await createPngBlob(canvas);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = getOutputName(item.file.name);
+  link.download = getOutputName(item.file.name, format);
   document.body.append(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
 }
 
-function getOutputName(fileName) {
+function createProcessedCanvas(image) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  drawImageToCanvas(image, canvas, context);
+  applyGrayscale(canvas, context);
+
+  return canvas;
+}
+
+function createPngBlob(canvas) {
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+
+function createSvgBlob(canvas, fileName) {
+  const title = escapeXml(fileName.replace(/\.[^.]+$/, ""));
+  const dataUrl = canvas.toDataURL("image/png");
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}" role="img" aria-label="${title}">
+  <title>${title}</title>
+  <image href="${dataUrl}" width="${canvas.width}" height="${canvas.height}" preserveAspectRatio="xMidYMid meet"/>
+</svg>
+`;
+
+  return new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+}
+
+function getSelectedFormat() {
+  return formatInputs.find((input) => input.checked)?.value ?? "png";
+}
+
+function getOutputName(fileName, format = getSelectedFormat()) {
   const cleanName = fileName.replace(/\.[^.]+$/, "");
   const suffix = renameFiles.checked ? "_gray" : "";
-  return `${cleanName}${suffix}.png`;
+  return `${cleanName}${suffix}.${format}`;
+}
+
+function escapeXml(value) {
+  return value.replace(/[<>&'"]/g, (character) => {
+    const entities = {
+      "<": "&lt;",
+      ">": "&gt;",
+      "&": "&amp;",
+      "'": "&apos;",
+      "\"": "&quot;",
+    };
+
+    return entities[character];
+  });
 }
 
 function formatBytes(bytes) {
