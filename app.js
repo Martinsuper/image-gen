@@ -39,6 +39,7 @@ const state = {
   items: [],
   activeId: null,
   renderId: 0,
+  renderTimer: null,
   isDownloading: false,
 };
 
@@ -103,7 +104,7 @@ resetTone.addEventListener("click", () => {
 [vectorColors, traceOriginalColor, ...formatInputs].forEach((input) => {
   input.addEventListener("change", () => {
     updateActions();
-    renderActive();
+    scheduleRenderActive();
   });
 });
 
@@ -123,6 +124,7 @@ downloadAll.addEventListener("click", async () => {
 });
 
 clearQueue.addEventListener("click", () => {
+  window.clearTimeout(state.renderTimer);
   state.items.forEach((item) => URL.revokeObjectURL(item.url));
   state.items = [];
   state.activeId = null;
@@ -163,7 +165,7 @@ function addFiles(fileLikeList) {
 
   renderQueue();
   updateActions();
-  renderActive();
+  scheduleRenderActive();
 }
 
 function getActiveItem() {
@@ -181,14 +183,15 @@ async function renderActive() {
   drawImageToCanvas(image, sourceCanvas, sourceCtx);
   drawImageToCanvas(image, resultCanvas, resultCtx);
   applyGrayscale(resultCanvas, resultCtx, getProcessingOptions());
-  renderResultPreview(image);
+  await renderResultPreview(image, renderId);
+  if (renderId !== state.renderId || item.id !== state.activeId) return;
 
   activeName.textContent = item.file.name;
   imageMeta.textContent = `${image.naturalWidth} x ${image.naturalHeight} · ${formatBytes(item.file.size)}`;
   previewPanel.classList.add("has-image");
 }
 
-function renderResultPreview(image) {
+async function renderResultPreview(image, renderId) {
   const format = getSelectedFormat();
 
   if (format !== "svg-vector") {
@@ -198,13 +201,21 @@ function renderResultPreview(image) {
   }
 
   const source = traceOriginalColor.checked ? createSourceCanvas(image) : resultCanvas;
+
+  resultCaption.textContent = "正在生成 SVG 路径描摹";
+  vectorPreview.style.setProperty("--preview-ratio", `${source.width} / ${source.height}`);
+  vectorPreview.textContent = "正在生成预览...";
+  setResultPreviewMode("vector");
+
+  await nextFrame();
+  if (renderId !== state.renderId || !getActiveItem()) return;
+
   const svg = createVectorSvgString(source, image.currentSrc || "vector-preview");
+  if (renderId !== state.renderId || !getActiveItem()) return;
 
   resultCaption.textContent = "SVG 路径描摹";
-  vectorPreview.style.setProperty("--preview-ratio", `${source.width} / ${source.height}`);
-  vectorPreview.replaceChildren();
+  vectorPreview.textContent = "";
   vectorPreview.insertAdjacentHTML("beforeend", svg);
-  setResultPreviewMode("vector");
 }
 
 function setResultPreviewMode(mode) {
@@ -228,7 +239,7 @@ function renderQueue() {
     button.addEventListener("click", () => {
       state.activeId = item.id;
       renderQueue();
-      renderActive();
+      scheduleRenderActive();
     });
 
     thumb.style.backgroundImage = `url("${item.url}")`;
@@ -534,7 +545,14 @@ async function runDownload(callback) {
 function handlePreviewOptionChange() {
   updateToneLabels();
   strengthValue.value = `${strength.value}%`;
-  renderActive();
+  scheduleRenderActive();
+}
+
+function scheduleRenderActive() {
+  window.clearTimeout(state.renderTimer);
+  state.renderTimer = window.setTimeout(() => {
+    renderActive();
+  }, getSelectedFormat() === "svg-vector" ? 120 : 40);
 }
 
 function updateToneLabels() {
@@ -551,6 +569,10 @@ function createId() {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(resolve));
 }
 
 function formatBytes(bytes) {
