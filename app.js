@@ -4,6 +4,8 @@ const fileList = document.querySelector("#fileList");
 const template = document.querySelector("#fileItemTemplate");
 const sourceCanvas = document.querySelector("#sourceCanvas");
 const resultCanvas = document.querySelector("#resultCanvas");
+const vectorPreview = document.querySelector("#vectorPreview");
+const resultCaption = document.querySelector("#resultCaption");
 const sourceCtx = sourceCanvas.getContext("2d", { willReadFrequently: true });
 const resultCtx = resultCanvas.getContext("2d", { willReadFrequently: true });
 const activeName = document.querySelector("#activeName");
@@ -55,8 +57,15 @@ strength.addEventListener("input", handlePreviewOptionChange);
   input.addEventListener("change", handlePreviewOptionChange);
 });
 
-[renameFiles, vectorColors, traceOriginalColor, ...formatInputs].forEach((input) => {
+[renameFiles].forEach((input) => {
   input.addEventListener("change", updateActions);
+});
+
+[vectorColors, traceOriginalColor, ...formatInputs].forEach((input) => {
+  input.addEventListener("change", () => {
+    updateActions();
+    renderActive();
+  });
 });
 
 downloadCurrent.addEventListener("click", async () => {
@@ -80,8 +89,11 @@ clearQueue.addEventListener("click", () => {
   state.activeId = null;
   sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
   resultCtx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
+  vectorPreview.replaceChildren();
   activeName.textContent = "还没有选择图片";
   imageMeta.textContent = "等待导入";
+  resultCaption.textContent = "灰度 PNG";
+  setResultPreviewMode("canvas");
   previewPanel.classList.remove("has-image");
   renderQueue();
   updateActions();
@@ -129,10 +141,37 @@ async function renderActive() {
   drawImageToCanvas(image, sourceCanvas, sourceCtx);
   drawImageToCanvas(image, resultCanvas, resultCtx);
   applyGrayscale(resultCanvas, resultCtx, getProcessingOptions());
+  renderResultPreview(image);
 
   activeName.textContent = item.file.name;
   imageMeta.textContent = `${image.naturalWidth} x ${image.naturalHeight} · ${formatBytes(item.file.size)}`;
   previewPanel.classList.add("has-image");
+}
+
+function renderResultPreview(image) {
+  const format = getSelectedFormat();
+
+  if (format !== "svg-vector") {
+    resultCaption.textContent = format === "svg-embed" ? "SVG 嵌入图" : "灰度 PNG";
+    setResultPreviewMode("canvas");
+    return;
+  }
+
+  const source = traceOriginalColor.checked ? createSourceCanvas(image) : resultCanvas;
+  const svg = createVectorSvgString(source, image.currentSrc || "vector-preview");
+
+  resultCaption.textContent = "SVG 路径描摹";
+  vectorPreview.style.setProperty("--preview-ratio", `${source.width} / ${source.height}`);
+  vectorPreview.replaceChildren();
+  vectorPreview.insertAdjacentHTML("beforeend", svg);
+  setResultPreviewMode("vector");
+}
+
+function setResultPreviewMode(mode) {
+  const showVector = mode === "vector";
+
+  resultCanvas.classList.toggle("is-hidden", showVector);
+  vectorPreview.classList.toggle("is-hidden", !showVector);
 }
 
 function renderQueue() {
@@ -305,6 +344,12 @@ function createEmbeddedSvgBlob(canvas, fileName) {
 }
 
 function createVectorSvgBlob(canvas, fileName) {
+  return new Blob([createVectorSvgString(canvas, fileName)], {
+    type: "image/svg+xml;charset=utf-8",
+  });
+}
+
+function createVectorSvgString(canvas, fileName) {
   const imageTracer = getImageTracer();
 
   if (!imageTracer) {
@@ -330,9 +375,7 @@ function createVectorSvgBlob(canvas, fileName) {
     desc: false,
   });
   const title = `<title>${escapeXml(fileName.replace(/\.[^.]+$/, ""))}</title>`;
-  const labeledSvg = svg.replace(/<svg\b([^>]*)>/, `<svg$1 role="img">${title}`);
-
-  return new Blob([labeledSvg], { type: "image/svg+xml;charset=utf-8" });
+  return svg.replace(/<svg\b([^>]*)>/, `<svg$1 role="img">${title}`);
 }
 
 function getImageTracer() {

@@ -317,10 +317,10 @@ figcaption {
   font-weight: 800;
 }
 
-canvas {
+canvas,
+.vector-preview {
   display: block;
   width: 100%;
-  height: auto;
   max-height: 540px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -336,7 +336,27 @@ canvas {
     8px -8px,
     -8px 0;
   background-size: 16px 16px;
+}
+
+canvas {
+  height: auto;
   object-fit: contain;
+}
+
+.vector-preview {
+  aspect-ratio: var(--preview-ratio, 1 / 1);
+  min-height: 260px;
+  overflow: auto;
+}
+
+.vector-preview svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.is-hidden {
+  display: none;
 }
 
 .preview-panel:not(.has-image) .canvas-compare {
