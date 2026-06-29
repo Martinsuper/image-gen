@@ -270,9 +270,9 @@ function createSvgBlob(canvas, fileName) {
   const title = escapeXml(fileName.replace(/\.[^.]+$/, ""));
   const dataUrl = canvas.toDataURL("image/png");
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}" role="img" aria-label="${title}">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}" preserveAspectRatio="xMidYMid meet" overflow="hidden" role="img" aria-label="${title}">
   <title>${title}</title>
-  <image href="${dataUrl}" width="${canvas.width}" height="${canvas.height}" preserveAspectRatio="xMidYMid meet"/>
+  <image x="0" y="0" width="${canvas.width}" height="${canvas.height}" href="${dataUrl}" xlink:href="${dataUrl}" preserveAspectRatio="none"/>
 </svg>
 `;
 
