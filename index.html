@@ -77,6 +77,21 @@
           </fieldset>
 
           <div class="field-row">
+            <label for="effectPreset">效果预设</label>
+          </div>
+          <select id="effectPreset" class="select-input">
+            <option value="natural" selected>自然灰度</option>
+            <option value="contrast">高对比</option>
+            <option value="soft">柔和层次</option>
+            <option value="lineart">黑白线稿</option>
+            <option value="poster">海报灰阶</option>
+            <option value="vectorArt">彩色矢量插画</option>
+          </select>
+
+          <details class="settings-block">
+            <summary>灰度高级设置</summary>
+
+          <div class="field-row">
             <label for="strength">灰度强度</label>
             <output id="strengthValue" for="strength">100%</output>
           </div>
@@ -198,11 +213,15 @@
           <button class="secondary-button compact-button" id="resetTone" type="button">
             重置影调
           </button>
+          </details>
 
           <label class="toggle-row">
             <input id="renameFiles" type="checkbox" checked />
             <span>文件名添加 _gray</span>
           </label>
+
+          <details class="settings-block">
+            <summary>矢量高级设置</summary>
 
           <div class="field-row">
             <label for="vectorPreset">矢量质量预设</label>
@@ -232,6 +251,7 @@
           <div class="complexity-note" id="complexityNote" role="status">
             矢量复杂度：等待图片
           </div>
+          </details>
 
           <div class="action-row">
             <button class="primary-button" id="downloadCurrent" disabled>

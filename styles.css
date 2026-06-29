@@ -286,6 +286,46 @@ button:focus-visible,
   padding: 0 10px;
 }
 
+.settings-block {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.settings-block summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-soft);
+  color: var(--ink);
+  padding: 0 11px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.settings-block summary::after {
+  content: "+";
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.settings-block[open] summary {
+  border-color: rgba(8, 117, 119, 0.28);
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+
+.settings-block[open] summary::after {
+  content: "-";
+}
+
+.settings-block > :not(summary) {
+  margin-top: 12px;
+}
+
 .complexity-note {
   border: 1px solid var(--line);
   border-radius: 7px;

@@ -31,6 +31,7 @@ const autoLevels = document.querySelector("#autoLevels");
 const invertTone = document.querySelector("#invertTone");
 const resetTone = document.querySelector("#resetTone");
 const renameFiles = document.querySelector("#renameFiles");
+const effectPreset = document.querySelector("#effectPreset");
 const vectorPreset = document.querySelector("#vectorPreset");
 const vectorColors = document.querySelector("#vectorColors");
 const traceOriginalColor = document.querySelector("#traceOriginalColor");
@@ -54,6 +55,105 @@ const VECTOR_PRESETS = {
   illustration: { colors: 16, pathomit: 3, ltres: 1, qtres: 1, cycles: 2, linefilter: true },
   high: { colors: 64, pathomit: 1, ltres: 0.45, qtres: 0.45, cycles: 3, linefilter: false },
   silhouette: { colors: 2, pathomit: 8, ltres: 1.5, qtres: 1.5, cycles: 1, linefilter: true },
+};
+
+const EFFECT_PRESETS = {
+  natural: {
+    format: "png",
+    mode: "luma",
+    strength: 100,
+    brightness: 0,
+    contrast: 0,
+    gamma: 100,
+    blackPoint: 0,
+    whitePoint: 255,
+    ditherMode: "none",
+    posterizeLevels: 0,
+    autoLevels: false,
+    invertTone: false,
+    traceOriginalColor: false,
+    vectorPreset: "illustration",
+  },
+  contrast: {
+    format: "png",
+    mode: "luma",
+    strength: 100,
+    brightness: 0,
+    contrast: 42,
+    gamma: 92,
+    blackPoint: 12,
+    whitePoint: 242,
+    ditherMode: "none",
+    posterizeLevels: 0,
+    autoLevels: true,
+    invertTone: false,
+    traceOriginalColor: false,
+    vectorPreset: "illustration",
+  },
+  soft: {
+    format: "png",
+    mode: "desaturate",
+    strength: 100,
+    brightness: 8,
+    contrast: -18,
+    gamma: 118,
+    blackPoint: 0,
+    whitePoint: 255,
+    ditherMode: "none",
+    posterizeLevels: 0,
+    autoLevels: false,
+    invertTone: false,
+    traceOriginalColor: false,
+    vectorPreset: "illustration",
+  },
+  lineart: {
+    format: "svg-vector",
+    mode: "luma",
+    strength: 100,
+    brightness: 0,
+    contrast: 65,
+    gamma: 90,
+    blackPoint: 24,
+    whitePoint: 225,
+    ditherMode: "none",
+    posterizeLevels: 2,
+    autoLevels: true,
+    invertTone: false,
+    traceOriginalColor: false,
+    vectorPreset: "line",
+  },
+  poster: {
+    format: "svg-vector",
+    mode: "luma",
+    strength: 100,
+    brightness: 0,
+    contrast: 24,
+    gamma: 100,
+    blackPoint: 8,
+    whitePoint: 248,
+    ditherMode: "none",
+    posterizeLevels: 8,
+    autoLevels: true,
+    invertTone: false,
+    traceOriginalColor: false,
+    vectorPreset: "illustration",
+  },
+  vectorArt: {
+    format: "svg-vector",
+    mode: "luma",
+    strength: 100,
+    brightness: 0,
+    contrast: 0,
+    gamma: 100,
+    blackPoint: 0,
+    whitePoint: 255,
+    ditherMode: "none",
+    posterizeLevels: 0,
+    autoLevels: false,
+    invertTone: false,
+    traceOriginalColor: true,
+    vectorPreset: "high",
+  },
 };
 
 const modeInputs = [...document.querySelectorAll('input[name="mode"]')];
@@ -100,6 +200,13 @@ strength.addEventListener("input", handlePreviewOptionChange);
 
 [renameFiles].forEach((input) => {
   input.addEventListener("change", updateActions);
+});
+
+effectPreset.addEventListener("change", () => {
+  applyEffectPreset(effectPreset.value);
+  updateActions();
+  updateComplexityNote();
+  handlePreviewOptionChange();
 });
 
 resetTone.addEventListener("click", () => {
@@ -678,6 +785,32 @@ function getVectorOptions() {
 function applyVectorPreset() {
   const preset = VECTOR_PRESETS[vectorPreset.value] ?? VECTOR_PRESETS.illustration;
   vectorColors.value = String(preset.colors);
+}
+
+function applyEffectPreset(name) {
+  const preset = EFFECT_PRESETS[name] ?? EFFECT_PRESETS.natural;
+
+  setRadioValue(modeInputs, preset.mode);
+  setRadioValue(formatInputs, preset.format);
+  strength.value = preset.strength;
+  brightness.value = preset.brightness;
+  contrast.value = preset.contrast;
+  gamma.value = preset.gamma;
+  blackPoint.value = preset.blackPoint;
+  whitePoint.value = preset.whitePoint;
+  ditherMode.value = preset.ditherMode;
+  posterizeLevels.value = preset.posterizeLevels;
+  autoLevels.checked = preset.autoLevels;
+  invertTone.checked = preset.invertTone;
+  traceOriginalColor.checked = preset.traceOriginalColor;
+  vectorPreset.value = preset.vectorPreset;
+  applyVectorPreset();
+}
+
+function setRadioValue(inputs, value) {
+  inputs.forEach((input) => {
+    input.checked = input.value === value;
+  });
 }
 
 function getSelectedFormat() {
