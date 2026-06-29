@@ -23,14 +23,17 @@ const blackPoint = document.querySelector("#blackPoint");
 const blackPointValue = document.querySelector("#blackPointValue");
 const whitePoint = document.querySelector("#whitePoint");
 const whitePointValue = document.querySelector("#whitePointValue");
+const ditherMode = document.querySelector("#ditherMode");
 const posterizeLevels = document.querySelector("#posterizeLevels");
 const keepAlpha = document.querySelector("#keepAlpha");
 const autoLevels = document.querySelector("#autoLevels");
 const invertTone = document.querySelector("#invertTone");
 const resetTone = document.querySelector("#resetTone");
 const renameFiles = document.querySelector("#renameFiles");
+const vectorPreset = document.querySelector("#vectorPreset");
 const vectorColors = document.querySelector("#vectorColors");
 const traceOriginalColor = document.querySelector("#traceOriginalColor");
+const complexityNote = document.querySelector("#complexityNote");
 const downloadCurrent = document.querySelector("#downloadCurrent");
 const downloadAll = document.querySelector("#downloadAll");
 const clearQueue = document.querySelector("#clearQueue");
@@ -40,7 +43,16 @@ const state = {
   activeId: null,
   renderId: 0,
   renderTimer: null,
+  traceWorker: null,
+  traceJobs: new Map(),
   isDownloading: false,
+};
+
+const VECTOR_PRESETS = {
+  line: { colors: 8, pathomit: 1, ltres: 0.5, qtres: 0.5, cycles: 2, linefilter: false },
+  illustration: { colors: 16, pathomit: 3, ltres: 1, qtres: 1, cycles: 2, linefilter: true },
+  high: { colors: 64, pathomit: 1, ltres: 0.45, qtres: 0.45, cycles: 3, linefilter: false },
+  silhouette: { colors: 2, pathomit: 8, ltres: 1.5, qtres: 1.5, cycles: 1, linefilter: true },
 };
 
 const modeInputs = [...document.querySelectorAll('input[name="mode"]')];
@@ -74,6 +86,7 @@ strength.addEventListener("input", handlePreviewOptionChange);
   gamma,
   blackPoint,
   whitePoint,
+  ditherMode,
   posterizeLevels,
   keepAlpha,
   autoLevels,
@@ -95,15 +108,20 @@ resetTone.addEventListener("click", () => {
   gamma.value = 100;
   blackPoint.value = 0;
   whitePoint.value = 255;
+  ditherMode.value = "none";
   posterizeLevels.value = 0;
   autoLevels.checked = false;
   invertTone.checked = false;
   handlePreviewOptionChange();
 });
 
-[vectorColors, traceOriginalColor, ...formatInputs].forEach((input) => {
+[vectorPreset, vectorColors, traceOriginalColor, ...formatInputs].forEach((input) => {
   input.addEventListener("change", () => {
+    if (input === vectorPreset) {
+      applyVectorPreset();
+    }
     updateActions();
+    updateComplexityNote();
     scheduleRenderActive();
   });
 });
@@ -116,11 +134,7 @@ downloadCurrent.addEventListener("click", async () => {
 
 downloadAll.addEventListener("click", async () => {
   if (!state.items.length || state.isDownloading) return;
-  await runDownload(async () => {
-    for (const item of state.items) {
-      await downloadItem(item);
-    }
-  });
+  await runDownload(downloadAllAsZip);
 });
 
 clearQueue.addEventListener("click", () => {
@@ -138,6 +152,7 @@ clearQueue.addEventListener("click", () => {
   previewPanel.classList.remove("has-image");
   renderQueue();
   updateActions();
+  updateComplexityNote();
 });
 
 if ("serviceWorker" in navigator) {
@@ -148,6 +163,7 @@ if ("serviceWorker" in navigator) {
 
 updateActions();
 updateToneLabels();
+applyVectorPreset();
 
 function addFiles(fileLikeList) {
   const files = [...fileLikeList].filter((file) => file.type.startsWith("image/"));
@@ -183,6 +199,7 @@ async function renderActive() {
   drawImageToCanvas(image, sourceCanvas, sourceCtx);
   drawImageToCanvas(image, resultCanvas, resultCtx);
   applyGrayscale(resultCanvas, resultCtx, getProcessingOptions());
+  updateComplexityNote(image);
   await renderResultPreview(image, renderId);
   if (renderId !== state.renderId || item.id !== state.activeId) return;
 
@@ -210,7 +227,7 @@ async function renderResultPreview(image, renderId) {
   await nextFrame();
   if (renderId !== state.renderId || !getActiveItem()) return;
 
-  const svg = createVectorSvgString(source, image.currentSrc || "vector-preview");
+  const svg = await createVectorSvgString(source, image.currentSrc || "vector-preview");
   if (renderId !== state.renderId || !getActiveItem()) return;
 
   resultCaption.textContent = "SVG 路径描摹";
@@ -254,10 +271,33 @@ function updateActions() {
   const format = getSelectedFormatLabel();
 
   downloadCurrent.textContent = `下载 ${format}`;
-  downloadAll.textContent = `批量下载 ${format}`;
+  downloadAll.textContent = `打包 ZIP`;
   downloadCurrent.disabled = !hasItems || state.isDownloading;
   downloadAll.disabled = !hasItems || state.isDownloading;
   clearQueue.disabled = !hasItems || state.isDownloading;
+}
+
+function updateComplexityNote(image = getActiveItem()?.image) {
+  if (!image) {
+    complexityNote.textContent = "矢量复杂度：等待图片";
+    complexityNote.classList.remove("is-warning");
+    return;
+  }
+
+  if (getSelectedFormat() !== "svg-vector") {
+    complexityNote.textContent = "矢量复杂度：仅在 SVG 路径描摹时生效";
+    complexityNote.classList.remove("is-warning");
+    return;
+  }
+
+  const megapixels = (image.naturalWidth * image.naturalHeight) / 1_000_000;
+  const colorCount = Number(vectorColors.value);
+  const score = megapixels * colorCount;
+  const level = score > 18 ? "高" : score > 7 ? "中" : "低";
+  const note = level === "高" ? "，生成可能需要几秒，SVG 文件也会更大" : "";
+
+  complexityNote.textContent = `矢量复杂度：${level}（${colorCount} 层，${megapixels.toFixed(2)}MP）${note}`;
+  complexityNote.classList.toggle("is-warning", level === "高");
 }
 
 function loadImage(item) {
@@ -309,7 +349,78 @@ function applyGrayscale(canvas, context, options = getProcessingOptions()) {
     }
   }
 
+  applyDither(imageData, options.ditherMode);
   context.putImageData(imageData, 0, 0);
+}
+
+function applyDither(imageData, mode) {
+  if (mode === "bayer") {
+    applyBayerDither(imageData);
+  }
+
+  if (mode === "floyd") {
+    applyFloydSteinbergDither(imageData);
+  }
+}
+
+function applyBayerDither(imageData) {
+  const matrix = [
+    [0, 8, 2, 10],
+    [12, 4, 14, 6],
+    [3, 11, 1, 9],
+    [15, 7, 13, 5],
+  ];
+  const { data, width, height } = imageData;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const threshold = (matrix[y % 4][x % 4] + 0.5) * 16;
+      const value = data[index] > threshold ? 255 : 0;
+
+      data[index] = value;
+      data[index + 1] = value;
+      data[index + 2] = value;
+    }
+  }
+}
+
+function applyFloydSteinbergDither(imageData) {
+  const { data, width, height } = imageData;
+  const buffer = new Float32Array(width * height);
+
+  for (let index = 0; index < buffer.length; index += 1) {
+    buffer[index] = data[index * 4];
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const bufferIndex = y * width + x;
+      const oldValue = buffer[bufferIndex];
+      const newValue = oldValue < 128 ? 0 : 255;
+      const error = oldValue - newValue;
+
+      buffer[bufferIndex] = newValue;
+      distributeError(buffer, width, height, x + 1, y, error * 7 / 16);
+      distributeError(buffer, width, height, x - 1, y + 1, error * 3 / 16);
+      distributeError(buffer, width, height, x, y + 1, error * 5 / 16);
+      distributeError(buffer, width, height, x + 1, y + 1, error * 1 / 16);
+    }
+  }
+
+  for (let index = 0; index < buffer.length; index += 1) {
+    const value = clamp(Math.round(buffer[index]), 0, 255);
+    const dataIndex = index * 4;
+
+    data[dataIndex] = value;
+    data[dataIndex + 1] = value;
+    data[dataIndex + 2] = value;
+  }
+}
+
+function distributeError(buffer, width, height, x, y, error) {
+  if (x < 0 || x >= width || y < 0 || y >= height) return;
+  buffer[y * width + x] += error;
 }
 
 function getAutoLevels(data, mode) {
@@ -383,6 +494,45 @@ async function downloadItem(item) {
   URL.revokeObjectURL(url);
 }
 
+async function downloadAllAsZip() {
+  const JSZip = getJSZip();
+
+  if (!JSZip) {
+    for (const item of state.items) {
+      await downloadItem(item);
+    }
+    return;
+  }
+
+  const zip = new JSZip();
+
+  for (const item of state.items) {
+    const image = await loadImage(item);
+    const canvas = createProcessedCanvas(image);
+    const format = getSelectedFormat();
+    const vectorSourceCanvas =
+      format === "svg-vector" && traceOriginalColor.checked ? createSourceCanvas(image) : canvas;
+    const blob = await createExportBlob(canvas, vectorSourceCanvas, item.file.name, format);
+
+    zip.file(getOutputName(item.file.name, format), blob);
+  }
+
+  const archive = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(archive);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `gray-exports-${Date.now()}.zip`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function getJSZip() {
+  return globalThis.JSZip ?? window.JSZip ?? self.JSZip;
+}
+
 async function createExportBlob(canvas, vectorSourceCanvas, fileName, format) {
   if (format === "svg-embed") {
     return createEmbeddedSvgBlob(canvas, fileName);
@@ -440,42 +590,73 @@ function createEmbeddedSvgBlob(canvas, fileName) {
 }
 
 function createVectorSvgBlob(canvas, fileName) {
-  return new Blob([createVectorSvgString(canvas, fileName)], {
+  return createVectorSvgString(canvas, fileName).then((svg) => new Blob([svg], {
     type: "image/svg+xml;charset=utf-8",
+  }));
+}
+
+async function createVectorSvgString(canvas, fileName) {
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const svg = await traceImageData(imageData, getVectorOptions());
+  const title = `<title>${escapeXml(fileName.replace(/\.[^.]+$/, ""))}</title>`;
+  return svg.replace(/<svg\b([^>]*)>/, `<svg$1 role="img">${title}`);
+}
+
+function traceImageData(imageData, options) {
+  const worker = getTraceWorker();
+  const id = createId();
+
+  return new Promise((resolve, reject) => {
+    state.traceJobs.set(id, { resolve, reject });
+    worker.postMessage({ id, imageData, options });
   });
 }
 
-function createVectorSvgString(canvas, fileName) {
-  const imageTracer = getImageTracer();
+function getTraceWorker() {
+  if (state.traceWorker) return state.traceWorker;
 
-  if (!imageTracer) {
-    throw new Error("Vector tracer is not available.");
-  }
+  state.traceWorker = new Worker("./vector-worker.js");
+  state.traceWorker.addEventListener("message", (event) => {
+    const { id, svg, error } = event.data;
+    const job = state.traceJobs.get(id);
+    if (!job) return;
 
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-  const colorCount = Number(vectorColors.value);
-  const svg = imageTracer.imagedataToSVG(imageData, {
+    state.traceJobs.delete(id);
+    if (error) {
+      job.reject(new Error(error));
+    } else {
+      job.resolve(svg);
+    }
+  });
+
+  return state.traceWorker;
+}
+
+function getVectorOptions() {
+  const preset = VECTOR_PRESETS[vectorPreset.value] ?? VECTOR_PRESETS.illustration;
+  const colorCount = Number(vectorColors.value || preset.colors);
+
+  return {
     colorsampling: 0,
-    colorquantcycles: colorCount >= 32 ? 3 : 2,
+    colorquantcycles: preset.cycles,
     numberofcolors: colorCount,
-    pathomit: colorCount >= 32 ? 1 : 3,
-    ltres: colorCount >= 32 ? 0.5 : 1,
-    qtres: colorCount >= 32 ? 0.5 : 1,
+    pathomit: preset.pathomit,
+    ltres: preset.ltres,
+    qtres: preset.qtres,
     rightangleenhance: true,
-    linefilter: true,
+    linefilter: preset.linefilter,
     strokewidth: 0,
     scale: 1,
     roundcoords: 1,
     viewbox: true,
     desc: false,
-  });
-  const title = `<title>${escapeXml(fileName.replace(/\.[^.]+$/, ""))}</title>`;
-  return svg.replace(/<svg\b([^>]*)>/, `<svg$1 role="img">${title}`);
+  };
 }
 
-function getImageTracer() {
-  return globalThis.ImageTracer ?? window.ImageTracer ?? self.ImageTracer;
+function applyVectorPreset() {
+  const preset = VECTOR_PRESETS[vectorPreset.value] ?? VECTOR_PRESETS.illustration;
+  vectorColors.value = String(preset.colors);
 }
 
 function getSelectedFormat() {
@@ -504,6 +685,7 @@ function getProcessingOptions() {
     whitePoint: Math.max(Number(whitePoint.value), Number(blackPoint.value) + 1),
     autoLevels: autoLevels.checked,
     invert: invertTone.checked,
+    ditherMode: ditherMode.value,
     posterizeLevels: Number(posterizeLevels.value),
   };
 }

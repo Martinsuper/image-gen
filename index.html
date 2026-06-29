@@ -160,6 +160,15 @@
           </div>
 
           <div class="field-row">
+            <label for="ditherMode">灰度抖动</label>
+          </div>
+          <select id="ditherMode" class="select-input">
+            <option value="none" selected>关闭</option>
+            <option value="bayer">有序点阵</option>
+            <option value="floyd">误差扩散</option>
+          </select>
+
+          <div class="field-row">
             <label for="posterizeLevels">灰阶层次</label>
           </div>
           <select id="posterizeLevels" class="select-input">
@@ -196,6 +205,16 @@
           </label>
 
           <div class="field-row">
+            <label for="vectorPreset">矢量质量预设</label>
+          </div>
+          <select id="vectorPreset" class="select-input">
+            <option value="line">线稿</option>
+            <option value="illustration" selected>插画</option>
+            <option value="high">高清插画</option>
+            <option value="silhouette">剪影</option>
+          </select>
+
+          <div class="field-row">
             <label for="vectorColors">矢量细节层数</label>
           </div>
           <select id="vectorColors" class="select-input">
@@ -209,6 +228,10 @@
             <input id="traceOriginalColor" type="checkbox" />
             <span>矢量描摹保留原色</span>
           </label>
+
+          <div class="complexity-note" id="complexityNote" role="status">
+            矢量复杂度：等待图片
+          </div>
 
           <div class="action-row">
             <button class="primary-button" id="downloadCurrent" disabled>
@@ -273,7 +296,7 @@
       </li>
     </template>
 
-    <script src="./vendor/imagetracer_v1.2.6.js"></script>
+    <script src="./vendor/jszip.min.js"></script>
     <script src="./app.js" type="module"></script>
   </body>
 </html>

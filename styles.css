@@ -286,6 +286,22 @@ button:focus-visible,
   padding: 0 10px;
 }
 
+.complexity-note {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  padding: 9px 10px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.complexity-note.is-warning {
+  border-color: rgba(179, 63, 63, 0.32);
+  background: #fff2f2;
+  color: var(--danger);
+}
+
 .tone-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
