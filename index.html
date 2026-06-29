@@ -89,10 +89,106 @@
             value="100"
           />
 
+          <div class="field-row">
+            <label for="brightness">亮度</label>
+            <output id="brightnessValue" for="brightness">0</output>
+          </div>
+          <input
+            id="brightness"
+            class="slider"
+            type="range"
+            min="-100"
+            max="100"
+            value="0"
+          />
+
+          <div class="field-row">
+            <label for="contrast">对比度</label>
+            <output id="contrastValue" for="contrast">0</output>
+          </div>
+          <input
+            id="contrast"
+            class="slider"
+            type="range"
+            min="-100"
+            max="100"
+            value="0"
+          />
+
+          <div class="field-row">
+            <label for="gamma">Gamma</label>
+            <output id="gammaValue" for="gamma">1.00</output>
+          </div>
+          <input
+            id="gamma"
+            class="slider"
+            type="range"
+            min="20"
+            max="300"
+            value="100"
+          />
+
+          <div class="tone-grid">
+            <div>
+              <div class="field-row">
+                <label for="blackPoint">黑场</label>
+                <output id="blackPointValue" for="blackPoint">0</output>
+              </div>
+              <input
+                id="blackPoint"
+                class="slider"
+                type="range"
+                min="0"
+                max="245"
+                value="0"
+              />
+            </div>
+            <div>
+              <div class="field-row">
+                <label for="whitePoint">白场</label>
+                <output id="whitePointValue" for="whitePoint">255</output>
+              </div>
+              <input
+                id="whitePoint"
+                class="slider"
+                type="range"
+                min="10"
+                max="255"
+                value="255"
+              />
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label for="posterizeLevels">灰阶层次</label>
+          </div>
+          <select id="posterizeLevels" class="select-input">
+            <option value="0" selected>连续灰度</option>
+            <option value="32">32 阶</option>
+            <option value="16">16 阶</option>
+            <option value="8">8 阶</option>
+            <option value="4">4 阶</option>
+            <option value="2">黑白</option>
+          </select>
+
           <label class="toggle-row">
             <input id="keepAlpha" type="checkbox" checked />
             <span>保留透明通道</span>
           </label>
+
+          <label class="toggle-row">
+            <input id="autoLevels" type="checkbox" />
+            <span>自动色阶</span>
+          </label>
+
+          <label class="toggle-row">
+            <input id="invertTone" type="checkbox" />
+            <span>反相</span>
+          </label>
+
+          <button class="secondary-button compact-button" id="resetTone" type="button">
+            重置影调
+          </button>
 
           <label class="toggle-row">
             <input id="renameFiles" type="checkbox" checked />

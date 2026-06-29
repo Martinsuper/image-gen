@@ -231,6 +231,12 @@ h2 {
   padding: 0 10px;
 }
 
+.tone-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .action-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -261,6 +267,10 @@ h2 {
   border-color: var(--line);
   background: #fffaf2;
   color: var(--ink);
+}
+
+.compact-button {
+  min-height: 38px;
 }
 
 .text-button {
@@ -497,6 +507,10 @@ canvas {
   }
 
   .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tone-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -13,7 +13,21 @@ const imageMeta = document.querySelector("#imageMeta");
 const previewPanel = document.querySelector(".preview-panel");
 const strength = document.querySelector("#strength");
 const strengthValue = document.querySelector("#strengthValue");
+const brightness = document.querySelector("#brightness");
+const brightnessValue = document.querySelector("#brightnessValue");
+const contrast = document.querySelector("#contrast");
+const contrastValue = document.querySelector("#contrastValue");
+const gamma = document.querySelector("#gamma");
+const gammaValue = document.querySelector("#gammaValue");
+const blackPoint = document.querySelector("#blackPoint");
+const blackPointValue = document.querySelector("#blackPointValue");
+const whitePoint = document.querySelector("#whitePoint");
+const whitePointValue = document.querySelector("#whitePointValue");
+const posterizeLevels = document.querySelector("#posterizeLevels");
 const keepAlpha = document.querySelector("#keepAlpha");
+const autoLevels = document.querySelector("#autoLevels");
+const invertTone = document.querySelector("#invertTone");
+const resetTone = document.querySelector("#resetTone");
 const renameFiles = document.querySelector("#renameFiles");
 const vectorColors = document.querySelector("#vectorColors");
 const traceOriginalColor = document.querySelector("#traceOriginalColor");
@@ -53,12 +67,37 @@ dropZone.addEventListener("drop", (event) => {
 
 strength.addEventListener("input", handlePreviewOptionChange);
 
-[keepAlpha, ...modeInputs].forEach((input) => {
+[
+  brightness,
+  contrast,
+  gamma,
+  blackPoint,
+  whitePoint,
+  posterizeLevels,
+  keepAlpha,
+  autoLevels,
+  invertTone,
+  ...modeInputs,
+].forEach((input) => {
   input.addEventListener("change", handlePreviewOptionChange);
+  input.addEventListener("input", handlePreviewOptionChange);
 });
 
 [renameFiles].forEach((input) => {
   input.addEventListener("change", updateActions);
+});
+
+resetTone.addEventListener("click", () => {
+  strength.value = 100;
+  brightness.value = 0;
+  contrast.value = 0;
+  gamma.value = 100;
+  blackPoint.value = 0;
+  whitePoint.value = 255;
+  posterizeLevels.value = 0;
+  autoLevels.checked = false;
+  invertTone.checked = false;
+  handlePreviewOptionChange();
 });
 
 [vectorColors, traceOriginalColor, ...formatInputs].forEach((input) => {
@@ -106,6 +145,7 @@ if ("serviceWorker" in navigator) {
 }
 
 updateActions();
+updateToneLabels();
 
 function addFiles(fileLikeList) {
   const files = [...fileLikeList].filter((file) => file.type.startsWith("image/"));
@@ -234,12 +274,20 @@ function applyGrayscale(canvas, context, options = getProcessingOptions()) {
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
   const { data } = imageData;
   const { amount, mode, preserveAlpha } = options;
+  const levels = options.autoLevels ? getAutoLevels(data, mode) : options;
+  const white = Math.max(levels.whitePoint, levels.blackPoint + 1);
+  const contrastFactor = (259 * (options.contrast + 255)) / (255 * (259 - options.contrast));
 
   for (let index = 0; index < data.length; index += 4) {
     const red = data[index];
     const green = data[index + 1];
     const blue = data[index + 2];
-    const gray = getGrayValue(red, green, blue, mode);
+    const gray = adjustTone(getGrayValue(red, green, blue, mode), {
+      ...options,
+      blackPoint: levels.blackPoint,
+      whitePoint: white,
+      contrastFactor,
+    });
 
     data[index] = mix(red, gray, amount);
     data[index + 1] = mix(green, gray, amount);
@@ -251,6 +299,43 @@ function applyGrayscale(canvas, context, options = getProcessingOptions()) {
   }
 
   context.putImageData(imageData, 0, 0);
+}
+
+function getAutoLevels(data, mode) {
+  let blackPoint = 255;
+  let whitePoint = 0;
+
+  for (let index = 0; index < data.length; index += 4) {
+    if (data[index + 3] === 0) continue;
+
+    const gray = getGrayValue(data[index], data[index + 1], data[index + 2], mode);
+    blackPoint = Math.min(blackPoint, gray);
+    whitePoint = Math.max(whitePoint, gray);
+  }
+
+  if (whitePoint <= blackPoint) {
+    return { blackPoint: 0, whitePoint: 255 };
+  }
+
+  return { blackPoint, whitePoint };
+}
+
+function adjustTone(gray, options) {
+  const normalized = clamp((gray - options.blackPoint) / (options.whitePoint - options.blackPoint), 0, 1);
+  let value = Math.pow(normalized, 1 / options.gamma) * 255;
+
+  value = options.contrastFactor * (value - 128) + 128 + options.brightness;
+
+  if (options.posterizeLevels > 1) {
+    const stepCount = options.posterizeLevels - 1;
+    value = Math.round((clamp(value, 0, 255) / 255) * stepCount) * (255 / stepCount);
+  }
+
+  if (options.invert) {
+    value = 255 - value;
+  }
+
+  return clamp(Math.round(value), 0, 255);
 }
 
 function getGrayValue(red, green, blue, mode) {
@@ -401,6 +486,14 @@ function getProcessingOptions() {
     amount: Number(strength.value) / 100,
     mode: modeInputs.find((input) => input.checked)?.value ?? "luma",
     preserveAlpha: keepAlpha.checked,
+    brightness: Number(brightness.value),
+    contrast: Number(contrast.value),
+    gamma: Number(gamma.value) / 100,
+    blackPoint: Number(blackPoint.value),
+    whitePoint: Math.max(Number(whitePoint.value), Number(blackPoint.value) + 1),
+    autoLevels: autoLevels.checked,
+    invert: invertTone.checked,
+    posterizeLevels: Number(posterizeLevels.value),
   };
 }
 
@@ -439,12 +532,25 @@ async function runDownload(callback) {
 }
 
 function handlePreviewOptionChange() {
+  updateToneLabels();
   strengthValue.value = `${strength.value}%`;
   renderActive();
 }
 
+function updateToneLabels() {
+  brightnessValue.value = brightness.value;
+  contrastValue.value = contrast.value;
+  gammaValue.value = (Number(gamma.value) / 100).toFixed(2);
+  blackPointValue.value = blackPoint.value;
+  whitePointValue.value = whitePoint.value;
+}
+
 function createId() {
   return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function formatBytes(bytes) {
