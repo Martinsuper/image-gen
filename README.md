@@ -35,4 +35,4 @@ http://localhost:5173
 - 构建命令：`npm run build`
 - 构建输出目录：`dist`
 
-如果使用无构建静态部署，也可以把输出目录设为仓库根目录。
+仓库里也提供了 `wrangler.toml`，明确把 Pages 输出目录和 Workers 静态资源目录都指向 `dist`，避免 Cloudflare 把仓库根目录或 `node_modules` 当作静态资源上传。
