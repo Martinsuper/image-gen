@@ -5,6 +5,7 @@ const template = document.querySelector("#fileItemTemplate");
 const sourceCanvas = document.querySelector("#sourceCanvas");
 const resultCanvas = document.querySelector("#resultCanvas");
 const vectorPreview = document.querySelector("#vectorPreview");
+const previewBadge = document.querySelector("#previewBadge");
 const resultCaption = document.querySelector("#resultCaption");
 const sourceCtx = sourceCanvas.getContext("2d", { willReadFrequently: true });
 const resultCtx = resultCanvas.getContext("2d", { willReadFrequently: true });
@@ -144,7 +145,8 @@ clearQueue.addEventListener("click", () => {
   state.activeId = null;
   sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
   resultCtx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
-  vectorPreview.replaceChildren();
+  replaceVectorPreview("");
+  setPreviewPending(false);
   activeName.textContent = "还没有选择图片";
   imageMeta.textContent = "等待导入";
   resultCaption.textContent = "灰度 PNG";
@@ -219,20 +221,27 @@ async function renderResultPreview(image, renderId) {
 
   const source = traceOriginalColor.checked ? createSourceCanvas(image) : resultCanvas;
 
-  resultCaption.textContent = "正在生成 SVG 路径描摹";
+  resultCaption.textContent = "灰度预览，正在生成 SVG";
   vectorPreview.style.setProperty("--preview-ratio", `${source.width} / ${source.height}`);
-  vectorPreview.textContent = "正在生成预览...";
-  setResultPreviewMode("vector");
+  setPreviewPending(true);
+  setResultPreviewMode("canvas");
 
   await nextFrame();
-  if (renderId !== state.renderId || !getActiveItem()) return;
+  if (renderId !== state.renderId || !getActiveItem()) {
+    setPreviewPending(false);
+    return;
+  }
 
   const svg = await createVectorSvgString(source, image.currentSrc || "vector-preview");
-  if (renderId !== state.renderId || !getActiveItem()) return;
+  if (renderId !== state.renderId || !getActiveItem()) {
+    setPreviewPending(false);
+    return;
+  }
 
   resultCaption.textContent = "SVG 路径描摹";
-  vectorPreview.textContent = "";
-  vectorPreview.insertAdjacentHTML("beforeend", svg);
+  replaceVectorPreview(svg);
+  setResultPreviewMode("vector");
+  setPreviewPending(false);
 }
 
 function setResultPreviewMode(mode) {
@@ -240,6 +249,18 @@ function setResultPreviewMode(mode) {
 
   resultCanvas.classList.toggle("is-hidden", showVector);
   vectorPreview.classList.toggle("is-hidden", !showVector);
+}
+
+function replaceVectorPreview(svg) {
+  [...vectorPreview.querySelectorAll("svg")].forEach((svgElement) => svgElement.remove());
+  if (svg) {
+    vectorPreview.insertAdjacentHTML("beforeend", svg);
+  }
+}
+
+function setPreviewPending(isPending) {
+  previewPanel.classList.toggle("is-rendering-vector", isPending);
+  previewBadge.classList.toggle("is-hidden", !isPending);
 }
 
 function renderQueue() {
