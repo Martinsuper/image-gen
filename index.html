@@ -99,6 +99,21 @@
             <span>文件名添加 _gray</span>
           </label>
 
+          <div class="field-row">
+            <label for="vectorColors">矢量细节层数</label>
+          </div>
+          <select id="vectorColors" class="select-input">
+            <option value="8">8 层</option>
+            <option value="16" selected>16 层</option>
+            <option value="32">32 层</option>
+            <option value="64">64 层</option>
+          </select>
+
+          <label class="toggle-row">
+            <input id="traceOriginalColor" type="checkbox" />
+            <span>矢量描摹保留原色</span>
+          </label>
+
           <div class="action-row">
             <button class="primary-button" id="downloadCurrent" disabled>
               下载当前

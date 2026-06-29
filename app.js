@@ -13,6 +13,8 @@ const strength = document.querySelector("#strength");
 const strengthValue = document.querySelector("#strengthValue");
 const keepAlpha = document.querySelector("#keepAlpha");
 const renameFiles = document.querySelector("#renameFiles");
+const vectorColors = document.querySelector("#vectorColors");
+const traceOriginalColor = document.querySelector("#traceOriginalColor");
 const downloadCurrent = document.querySelector("#downloadCurrent");
 const downloadAll = document.querySelector("#downloadAll");
 const clearQueue = document.querySelector("#clearQueue");
@@ -53,7 +55,7 @@ strength.addEventListener("input", handlePreviewOptionChange);
   input.addEventListener("change", handlePreviewOptionChange);
 });
 
-[renameFiles, ...formatInputs].forEach((input) => {
+[renameFiles, vectorColors, traceOriginalColor, ...formatInputs].forEach((input) => {
   input.addEventListener("change", updateActions);
 });
 
@@ -232,7 +234,9 @@ async function downloadItem(item) {
   const image = await loadImage(item);
   const canvas = createProcessedCanvas(image);
   const format = getSelectedFormat();
-  const blob = await createExportBlob(canvas, item.file.name, format);
+  const vectorSourceCanvas =
+    format === "svg-vector" && traceOriginalColor.checked ? createSourceCanvas(image) : canvas;
+  const blob = await createExportBlob(canvas, vectorSourceCanvas, item.file.name, format);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
@@ -244,16 +248,25 @@ async function downloadItem(item) {
   URL.revokeObjectURL(url);
 }
 
-async function createExportBlob(canvas, fileName, format) {
+async function createExportBlob(canvas, vectorSourceCanvas, fileName, format) {
   if (format === "svg-embed") {
     return createEmbeddedSvgBlob(canvas, fileName);
   }
 
   if (format === "svg-vector") {
-    return createVectorSvgBlob(canvas, fileName);
+    return createVectorSvgBlob(vectorSourceCanvas, fileName);
   }
 
   return createPngBlob(canvas);
+}
+
+function createSourceCanvas(image) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  drawImageToCanvas(image, canvas, context);
+
+  return canvas;
 }
 
 function createProcessedCanvas(image) {
@@ -300,13 +313,14 @@ function createVectorSvgBlob(canvas, fileName) {
 
   const context = canvas.getContext("2d", { willReadFrequently: true });
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const colorCount = Number(vectorColors.value);
   const svg = imageTracer.imagedataToSVG(imageData, {
     colorsampling: 0,
-    colorquantcycles: 1,
-    numberofcolors: 8,
-    pathomit: 4,
-    ltres: 1,
-    qtres: 1,
+    colorquantcycles: colorCount >= 32 ? 3 : 2,
+    numberofcolors: colorCount,
+    pathomit: colorCount >= 32 ? 1 : 3,
+    ltres: colorCount >= 32 ? 0.5 : 1,
+    qtres: colorCount >= 32 ? 0.5 : 1,
     rightangleenhance: true,
     linefilter: true,
     strokewidth: 0,

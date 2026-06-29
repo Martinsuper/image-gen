@@ -221,6 +221,16 @@ h2 {
   accent-color: var(--accent);
 }
 
+.select-input {
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  padding: 0 10px;
+}
+
 .action-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
