@@ -20,6 +20,8 @@ const clearQueue = document.querySelector("#clearQueue");
 const state = {
   items: [],
   activeId: null,
+  renderId: 0,
+  isDownloading: false,
 };
 
 const modeInputs = [...document.querySelectorAll('input[name="mode"]')];
@@ -45,25 +47,29 @@ dropZone.addEventListener("drop", (event) => {
   addFiles(event.dataTransfer.files);
 });
 
-strength.addEventListener("input", () => {
-  strengthValue.value = `${strength.value}%`;
-  renderActive();
+strength.addEventListener("input", handlePreviewOptionChange);
+
+[keepAlpha, ...modeInputs].forEach((input) => {
+  input.addEventListener("change", handlePreviewOptionChange);
 });
 
-[keepAlpha, renameFiles, ...modeInputs, ...formatInputs].forEach((input) => {
-  input.addEventListener("change", renderActive);
+[renameFiles, ...formatInputs].forEach((input) => {
+  input.addEventListener("change", updateActions);
 });
 
 downloadCurrent.addEventListener("click", async () => {
   const item = getActiveItem();
-  if (!item) return;
-  await downloadItem(item);
+  if (!item || state.isDownloading) return;
+  await runDownload(() => downloadItem(item));
 });
 
 downloadAll.addEventListener("click", async () => {
-  for (const item of state.items) {
-    await downloadItem(item);
-  }
+  if (!state.items.length || state.isDownloading) return;
+  await runDownload(async () => {
+    for (const item of state.items) {
+      await downloadItem(item);
+    }
+  });
 });
 
 clearQueue.addEventListener("click", () => {
@@ -85,10 +91,12 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+updateActions();
+
 function addFiles(fileLikeList) {
   const files = [...fileLikeList].filter((file) => file.type.startsWith("image/"));
   const items = files.map((file) => ({
-    id: crypto.randomUUID(),
+    id: createId(),
     file,
     url: URL.createObjectURL(file),
     image: null,
@@ -112,10 +120,13 @@ async function renderActive() {
   const item = getActiveItem();
   if (!item) return;
 
+  const renderId = ++state.renderId;
   const image = await loadImage(item);
+  if (renderId !== state.renderId || item.id !== state.activeId) return;
+
   drawImageToCanvas(image, sourceCanvas, sourceCtx);
   drawImageToCanvas(image, resultCanvas, resultCtx);
-  applyGrayscale(resultCanvas, resultCtx);
+  applyGrayscale(resultCanvas, resultCtx, getProcessingOptions());
 
   activeName.textContent = item.file.name;
   imageMeta.textContent = `${image.naturalWidth} x ${image.naturalHeight} · ${formatBytes(item.file.size)}`;
@@ -148,9 +159,13 @@ function renderQueue() {
 
 function updateActions() {
   const hasItems = state.items.length > 0;
-  downloadCurrent.disabled = !hasItems;
-  downloadAll.disabled = !hasItems;
-  clearQueue.disabled = !hasItems;
+  const format = getSelectedFormat().toUpperCase();
+
+  downloadCurrent.textContent = `下载 ${format}`;
+  downloadAll.textContent = `批量下载 ${format}`;
+  downloadCurrent.disabled = !hasItems || state.isDownloading;
+  downloadAll.disabled = !hasItems || state.isDownloading;
+  clearQueue.disabled = !hasItems || state.isDownloading;
 }
 
 function loadImage(item) {
@@ -174,11 +189,10 @@ function drawImageToCanvas(image, canvas, context) {
   context.drawImage(image, 0, 0);
 }
 
-function applyGrayscale(canvas, context) {
+function applyGrayscale(canvas, context, options = getProcessingOptions()) {
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
   const { data } = imageData;
-  const amount = Number(strength.value) / 100;
-  const mode = modeInputs.find((input) => input.checked)?.value ?? "luma";
+  const { amount, mode, preserveAlpha } = options;
 
   for (let index = 0; index < data.length; index += 4) {
     const red = data[index];
@@ -190,7 +204,7 @@ function applyGrayscale(canvas, context) {
     data[index + 1] = mix(green, gray, amount);
     data[index + 2] = mix(blue, gray, amount);
 
-    if (!keepAlpha.checked) {
+    if (!preserveAlpha) {
       data[index + 3] = 255;
     }
   }
@@ -235,13 +249,21 @@ function createProcessedCanvas(image) {
   const context = canvas.getContext("2d", { willReadFrequently: true });
 
   drawImageToCanvas(image, canvas, context);
-  applyGrayscale(canvas, context);
+  applyGrayscale(canvas, context, getProcessingOptions());
 
   return canvas;
 }
 
 function createPngBlob(canvas) {
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error("PNG export failed."));
+      }
+    }, "image/png");
+  });
 }
 
 function createSvgBlob(canvas, fileName) {
@@ -259,6 +281,14 @@ function createSvgBlob(canvas, fileName) {
 
 function getSelectedFormat() {
   return formatInputs.find((input) => input.checked)?.value ?? "png";
+}
+
+function getProcessingOptions() {
+  return {
+    amount: Number(strength.value) / 100,
+    mode: modeInputs.find((input) => input.checked)?.value ?? "luma",
+    preserveAlpha: keepAlpha.checked,
+  };
 }
 
 function getOutputName(fileName, format = getSelectedFormat()) {
@@ -279,6 +309,26 @@ function escapeXml(value) {
 
     return entities[character];
   });
+}
+
+async function runDownload(callback) {
+  try {
+    state.isDownloading = true;
+    updateActions();
+    await callback();
+  } finally {
+    state.isDownloading = false;
+    updateActions();
+  }
+}
+
+function handlePreviewOptionChange() {
+  strengthValue.value = `${strength.value}%`;
+  renderActive();
+}
+
+function createId() {
+  return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function formatBytes(bytes) {
