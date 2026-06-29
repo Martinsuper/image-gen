@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="在浏览器本地将照片转换为 PNG 灰度图片。"
+    />
+    <meta name="theme-color" content="#f6f3ee" />
+    <title>灰度 PNG 转换器</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">本地图片工具</p>
+          <h1>灰度 PNG 转换器</h1>
+        </div>
+        <div class="status-pill" id="privacyStatus">照片不会上传</div>
+      </header>
+
+      <section class="workspace" aria-label="图片转换工作区">
+        <aside class="control-panel">
+          <label class="drop-zone" id="dropZone">
+            <input
+              id="fileInput"
+              type="file"
+              accept="image/*"
+              multiple
+              aria-label="选择图片"
+            />
+            <span class="drop-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="img">
+                <path
+                  d="M12 3v11m0-11 4 4m-4-4-4 4M5 15v3a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-3"
+                />
+              </svg>
+            </span>
+            <span class="drop-title">拖入照片或选择文件</span>
+            <span class="drop-copy">支持 JPG、PNG、WebP、GIF、BMP</span>
+          </label>
+
+          <fieldset class="option-group">
+            <legend>灰度算法</legend>
+            <label>
+              <input type="radio" name="mode" value="luma" checked />
+              标准亮度
+            </label>
+            <label>
+              <input type="radio" name="mode" value="average" />
+              平均值
+            </label>
+            <label>
+              <input type="radio" name="mode" value="desaturate" />
+              去饱和
+            </label>
+          </fieldset>
+
+          <div class="field-row">
+            <label for="strength">灰度强度</label>
+            <output id="strengthValue" for="strength">100%</output>
+          </div>
+          <input
+            id="strength"
+            class="slider"
+            type="range"
+            min="0"
+            max="100"
+            value="100"
+          />
+
+          <label class="toggle-row">
+            <input id="keepAlpha" type="checkbox" checked />
+            <span>保留透明通道</span>
+          </label>
+
+          <label class="toggle-row">
+            <input id="renameFiles" type="checkbox" checked />
+            <span>文件名添加 _gray</span>
+          </label>
+
+          <div class="action-row">
+            <button class="primary-button" id="downloadCurrent" disabled>
+              下载当前
+            </button>
+            <button class="secondary-button" id="downloadAll" disabled>
+              批量下载
+            </button>
+          </div>
+        </aside>
+
+        <section class="preview-panel" aria-label="图片预览">
+          <div class="preview-header">
+            <div>
+              <p class="eyebrow">预览</p>
+              <h2 id="activeName">还没有选择图片</h2>
+            </div>
+            <p class="image-meta" id="imageMeta">等待导入</p>
+          </div>
+
+          <div class="canvas-compare" id="previewArea">
+            <figure>
+              <figcaption>原图</figcaption>
+              <canvas id="sourceCanvas"></canvas>
+            </figure>
+            <figure>
+              <figcaption>灰度 PNG</figcaption>
+              <canvas id="resultCanvas"></canvas>
+            </figure>
+          </div>
+
+          <div class="empty-state" id="emptyState">
+            <strong>选择一张照片开始</strong>
+            <span>所有像素处理都在当前浏览器完成。</span>
+          </div>
+        </section>
+
+        <section class="queue-panel" aria-label="图片列表">
+          <div class="queue-header">
+            <h2>图片列表</h2>
+            <button class="text-button" id="clearQueue" disabled>清空</button>
+          </div>
+          <ul class="file-list" id="fileList"></ul>
+        </section>
+      </section>
+    </main>
+
+    <template id="fileItemTemplate">
+      <li>
+        <button class="file-item" type="button">
+          <span class="file-thumb"></span>
+          <span class="file-details">
+            <span class="file-name"></span>
+            <span class="file-size"></span>
+          </span>
+        </button>
+      </li>
+    </template>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

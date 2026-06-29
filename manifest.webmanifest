@@ -1,0 +1,17 @@
+{
+  "name": "灰度 PNG 转换器",
+  "short_name": "灰度PNG",
+  "description": "在浏览器本地将照片转换为 PNG 灰度图片。",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f3ee",
+  "theme_color": "#156f72",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
